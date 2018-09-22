@@ -1,0 +1,16 @@
+.tickersContainer {
+  width: 50%;
+  display: inline-block;
+}
+
+.tickersContainer .header,
+.tickersContainer li {
+  display: flex;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.tickersContainer .header > div,
+.tickersContainer li > div {
+  padding: 5px;
+}
