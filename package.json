@@ -10,7 +10,9 @@
     "react-redux": "^5.0.7",
     "react-scripts": "1.1.5",
     "redux": "^4.0.0",
-    "redux-thunk": "^2.3.0"
+    "redux-thunk": "^2.3.0",
+    "xstream": "^11.7.0",
+    "xstream-redux-observable": "git+ssh://git@github.com:adz5a/xstream-redux-observable.git"
   },
   "scripts": {
     "start": "react-scripts start",

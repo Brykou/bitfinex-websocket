@@ -1,6 +1,5 @@
 // Sync actions
-import axios from "axios";
-
+import xstream from "xstream";
 let socket = null;
 
 export const CONECTION_STATUS_UPDATED = "connection_status";
@@ -44,72 +43,61 @@ export function updateChannel(data) {
   };
 }
 
-//Async
+export const createSocket$ = () => {
 
-export function openSocketConnection() {
-  return function(dispatch) {
-    socket = new WebSocket("wss://api.bitfinex.com/ws");
-
-    socket.onerror = function(event) {
-      console.error("WebSocket error observed:", event);
-    };
-
-    socket.onopen = function() {
-      // return axios.get("https://api.bitfinex.com/v1/symbols");
-      return new Promise(resolve => {
-        resolve(["btcusd", "ltcusd", "ltcbtc", "ethusd"]);
-      }).then(response => {
-        response.forEach(ticker => {
-          socket.send(
-            JSON.stringify({
-              event: "subscribe",
-              channel: "ticker",
-              pair: ticker
-            })
-          );
-        });
+  return xstream.create({
+    start (listener) {
+      const tickers = ["btcusd", "ltcusd", "ltcbtc", "ethusd"];
+      this.socket = new WebSocket("wss://api.bitfinex.com/ws");
+      this.socket.onerror = (e) => listener.error(e);
+      this.socket.onopen = () => tickers.forEach(ticker => {
+        this.socket.send(JSON.stringify({
+          event: "subscribe",
+          channel: "ticker",
+          pair: ticker
+        }));
       });
-    };
+      this.socket.onclose = (e) => {
+        listener.complete();
+      };
+      this.socket.onmessage = (message) => {
+        const data = JSON.parse(message.data);
+        console.log(data.event);
+        switch (data.event) {
+          case "info":
+            if (data.platform && data.platform.status === 1) {
+              console.log(`Info from socket API: ${JSON.stringify(data)}`);
+              return listener.next(updateConnectionStatus(true));
+            }
+          case "subscribed":
+            if (data.channel === "ticker") {
+              return listener.next(subscribedToTicker(data));
+            } else if (data.channel === "trades") {
+              return listener.next(subscribedToTrade(data));
+            }
+          case "error":
+            console.error(`Error from socket API: ${data.msg}`);
+            return {
+              type: "SOCKET_ERROR",
+              payload: data
+            };
+          default:
+            console.log(data);
+            if (data[1] !== "hb") {
+              return listener.next(updateChannel(data));
+            }
+        }
+      };
+    },
+    stop () {
+      console.log("closing");
+      this.socket.close();
+      this.socket = null;
+    },
+    socket: null
+  }); 
 
-    socket.onclose = function(event) {
-      dispatch(updateConnectionStatus(false));
-    };
-
-    socket.onmessage = function(message) {
-      const data = JSON.parse(message.data);
-      switch (data.event) {
-        case "info":
-          if (data.platform && data.platform.status === 1) {
-            dispatch(updateConnectionStatus(true));
-          }
-          console.log(`Info from socket API: ${JSON.stringify(data)}`);
-          break;
-        case "subscribed":
-          if (data.channel === "ticker") {
-            dispatch(subscribedToTicker(data));
-          } else if (data.channel === "trades") {
-            dispatch(subscribedToTrade(data));
-          }
-          break;
-        case "error":
-          console.error(`Error from socket API: ${data.msg}`);
-          break;
-        default:
-          console.log(data);
-          if (data[1] !== "hb") {
-            dispatch(updateChannel(data));
-          }
-          break;
-      }
-    };
-  };
-}
-
-export function closeSocketConnection() {
-  return function() {
-    socket.close();
-  };
-}
+};
 
 export function updateCurrentTicker(data) {
   return function() {
