@@ -1,6 +1,5 @@
 import { connect } from "react-redux";
 import Panel from "../components/Panel";
-import { openSocketConnection, closeSocketConnection } from "../redux/actions";
 
 const mapStateToProps = state => {
   return {
@@ -9,8 +8,8 @@ const mapStateToProps = state => {
 };
 
 const mapDispatchToProps = dispatch => ({
-  openConnection: () => dispatch(openSocketConnection()),
-  closeConnection: () => dispatch(closeSocketConnection())
+  openConnection: () => dispatch({ type: "OPEN_SOCKET" }),
+  closeConnection: () => dispatch({ type: "CLOSE_SOCKET" })
 });
 
 export default connect(
