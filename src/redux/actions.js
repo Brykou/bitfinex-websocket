@@ -43,58 +43,77 @@ export function updateChannel(data) {
   };
 }
 
-export const createSocket$ = () => {
+export const createSocket$ = (action$) => {
 
   return xstream.create({
     start (listener) {
-      const tickers = ["btcusd", "ltcusd", "ltcbtc", "ethusd"];
-      this.socket = new WebSocket("wss://api.bitfinex.com/ws");
-      this.socket.onerror = (e) => listener.error(e);
-      this.socket.onopen = () => tickers.forEach(ticker => {
-        this.socket.send(JSON.stringify({
-          event: "subscribe",
-          channel: "ticker",
-          pair: ticker
-        }));
-      });
-      this.socket.onclose = (e) => {
-        listener.complete();
+
+      const ws = new WebSocket("wss://api.bitfinex.com/ws");
+      this.ws = ws;
+      ws.onopen = () => {
+
+        listener.next({
+          type: CONECTION_STATUS_UPDATED,
+          payload: true
+        });
+
       };
-      this.socket.onmessage = (message) => {
-        const data = JSON.parse(message.data);
-        console.log(data.event);
-        switch (data.event) {
-          case "info":
-            if (data.platform && data.platform.status === 1) {
-              console.log(`Info from socket API: ${JSON.stringify(data)}`);
-              return listener.next(updateConnectionStatus(true));
+
+      ws.onerror = (e) => {
+
+        listener.next({
+          type: "SOCKET_ERROR",
+          payload: e
+        });
+
+      };
+
+      ws.onmessage = (message) => {
+        try {
+          const { event, ...payload } = JSON.parse(message.data);
+          listener.next({
+            type: "SOCKET_RECEIVED_MESSAGE",
+            data: {
+              event,
+              payload
             }
-          case "subscribed":
-            if (data.channel === "ticker") {
-              return listener.next(subscribedToTicker(data));
-            } else if (data.channel === "trades") {
-              return listener.next(subscribedToTrade(data));
+          });
+        } catch (error) {
+          listener.next({
+            type: "SOCKET_RECEIVED_MALFORMED_MESSAGE",
+            data: {
+              message: message.data,
+              error
             }
-          case "error":
-            console.error(`Error from socket API: ${data.msg}`);
-            return {
-              type: "SOCKET_ERROR",
-              payload: data
-            };
-          default:
-            console.log(data);
-            if (data[1] !== "hb") {
-              return listener.next(updateChannel(data));
+          });
+        }
+
+      };
+
+      this.actionsListener = {
+        next (action) {
+          switch (action.type) {
+            case "SOCKET_SEND_MESSAGE": {
+              return ws.send(JSON.stringify(action.data));
             }
+          }
+        },
+        error (error) {
+          listener.error(error);
+        },
+        complete () {
+          listener.complete();
         }
       };
+
+      action$.addListener(this.actionsListener);
     },
     stop () {
-      console.log("closing");
-      this.socket.close();
-      this.socket = null;
+      this.ws.close();
+      action$.removeListener(this.actionsListener);
     },
-    socket: null
+    actionsListener: null,
+    ws: null
   }); 
 
 };

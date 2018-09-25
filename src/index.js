@@ -2,7 +2,6 @@ import React from "react";
 import ReactDOM from "react-dom";
 import { Provider } from "react-redux";
 import { createStore, applyMiddleware, compose } from "redux";
-import reduxThunk from "redux-thunk";
 import xstream from "xstream";
 import { createMiddleware } from "xstream-redux-observable";
 
@@ -14,25 +13,16 @@ import "./index.css";
 
 const mw = createMiddleware((actions$) => {
 
-  return actions$
-    .filter(action => action.type === "OPEN_SOCKET")
-    .map(() => {
-      const message$ = createSocket$().endWhen(actions$.filter(action => action.type === "CLOSE_SOCKET"))
-      const closed$ = message$.last().mapTo({ type: "SOCKET_CLOSED" });
+  const message$ = createSocket$(actions$).endWhen(actions$.filter(action => action.type === "CLOSE_SOCKET"));
 
-      return xstream.merge(message$, closed$)
-    })
-    .flatten()
-    .replaceError((e) => {
-      return xstream.empty();
-    });
+  return message$;
 
 });
 
 const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
 const store = createStore(
   reducers,
-  composeEnhancers(applyMiddleware(reduxThunk, mw))
+  composeEnhancers(applyMiddleware( mw))
 );
 // store.dispatch(openSocketConnection());
 
