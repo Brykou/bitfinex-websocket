@@ -35,6 +35,12 @@ export default (state = initialState, action) => {
           return channel[0] === action.payload[0] ? action.payload : channel;
         })
       });
+    case "SOCKET_CLOSED":{
+      return {
+        ...state,
+        isConnected: false
+      };
+    }
     default:
       return state;
   }
